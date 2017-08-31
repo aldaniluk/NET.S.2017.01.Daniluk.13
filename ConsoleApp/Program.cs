@@ -8,13 +8,20 @@ namespace ConsoleApp
     {
         static void Main(string[] args)
         {
-            Queue<int> iqueue = new Queue<int>();
+            Queue<int> iqueue = new Queue<int>(6);
             iqueue.Enqueue(1);
             iqueue.Enqueue(2);
             iqueue.Enqueue(3);
             iqueue.Enqueue(4);
             iqueue.Enqueue(5);
-            
+            iqueue.Dequeue(4);
+            iqueue.Enqueue(6);
+            iqueue.Enqueue(7);
+            iqueue.Enqueue(8);
+            iqueue.Enqueue(9);
+            iqueue.Enqueue(10);
+            iqueue.Enqueue(11);
+
             foreach (var i in iqueue)
             {
                 Console.WriteLine(i);

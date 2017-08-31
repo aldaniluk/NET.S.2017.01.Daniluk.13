@@ -10,13 +10,14 @@ namespace Logic
     /// Generic collection queue.
     /// </summary>
     /// <typeparam name="T">Type for substitution.</typeparam>
-    public class Queue<T> : IEnumerable<T>, IEquatable<Queue<T>> where T : IEquatable<T> 
+    public class Queue<T> : IEnumerable<T> 
     {
         #region fields
         private T[] array;
+        private int head;
+        private int tail;
         private int count;
         private int capacity = 10;
-
         private bool isFull => count == capacity;
         #endregion
 
@@ -59,9 +60,9 @@ namespace Logic
         /// <param name="collection">Collection to copy elements into queue.</param>
         public Queue(IEnumerable<T> collection)
         {
-            if (ReferenceEquals(collection, null)) throw new ArgumentNullException($"{nameof(collection)} is null.");
+            if (collection == null) throw new ArgumentNullException($"{nameof(collection)} is null.");
 
-            array = new T[collection.Count() * 2];
+            array = new T[collection.Count()];
             foreach (T element in collection)
             {
                 Enqueue(element);
@@ -80,22 +81,25 @@ namespace Logic
             
             if (isFull) Expansion();
 
-            array[count] = element;
+            array[tail] = element;
+            tail = (tail + 1) % capacity;
             count++;
         }
 
         /// <summary>
-        /// Removes an element from queue.
+        ///  Removes an element from queue.
         /// </summary>
-        public void Dequeue()
+        /// <returns>Removed element.</returns>
+        public T Dequeue()
         {
-            if (IsEmpty) throw new ArgumentException("Queue is empty.");
-            
-            for (int i = 0; i < array.Length - 1; i++)
-            {
-                array[i] = array[i + 1];
-            }
-            array[--count] = default(T);
+            if (IsEmpty) throw new InvalidOperationException("Queue is empty.");
+
+            T removed = array[head];
+            array[head] = default(T);
+            head = (head + 1) % capacity;
+            count--;
+
+            return removed;
         }
 
         /// <summary>
@@ -104,7 +108,7 @@ namespace Logic
         /// <param name="quantity">Quantity of elements to remove.</param>
         public void Dequeue(int quantity)
         {
-            if (quantity < 0 || quantity > array.Length) throw new ArgumentNullException($"{nameof(quantity)} is unsuitable.");
+            if (quantity < 0 || quantity > array.Length) throw new ArgumentException($"{nameof(quantity)} is unsuitable.");
             
             while(quantity > 0)
             {
@@ -119,9 +123,9 @@ namespace Logic
         /// <returns>First element in the queue.</returns>
         public T Peek()
         {
-            if (IsEmpty) throw new ArgumentException("Queue is empty.");
+            if (IsEmpty) throw new InvalidOperationException("Queue is empty.");
             
-            return array[0];
+            return array[head];
         }
 
         /// <summary>
@@ -131,7 +135,7 @@ namespace Logic
         /// <returns>True, if element presents, and false otherwise.</returns>
         public bool Contains(T element)
         {
-            if (IsEmpty) throw new ArgumentException("Queue is empty.");
+            if (IsEmpty) throw new InvalidOperationException("Queue is empty.");
             if (ReferenceEquals(element, null)) throw new ArgumentNullException($"{nameof(element)} is null.");
                 
             for (int i = 0; i < count; i++)
@@ -147,62 +151,26 @@ namespace Logic
         /// </summary>
         public void Clear()
         {
-            if (IsEmpty) throw new ArgumentException("Queue is empty.");
+            if (IsEmpty) throw new InvalidOperationException("Queue is empty.");
 
             count = 0;
-            capacity = 10;
+            head = 0;
+            tail = 0;
             array = new T[capacity];
         }
-
-        /// <summary>
-        /// Returns string representation of queue.
-        /// </summary>
-        /// <returns>String representation of queue.</returns>
-        public override string ToString()
-        {
-            if (IsEmpty) return "Queue is empty.";
-            
-            StringBuilder str = new StringBuilder();
-            for (int i = 0; i < count; i++)
-            {
-                str.Append(array[i].ToString() + " ");
-            }
-            return str.ToString();
-        }
-
-        /// <summary>
-        /// Compares two queues for equality.
-        /// </summary>
-        /// <param name="other">Second queue to compare.</param>
-        /// <returns>True, if queues are equal, and false otherwise.</returns>
-        public bool Equals(Queue<T> other)
-        {
-            if (ReferenceEquals(other, null)) throw new ArgumentNullException($"{nameof(other)} is null.");
-
-            if (other.Count != this.Count) return false;
-
-            for (int i = 0; i < this.Count; i++)
-            {
-                if (!this.array[i].Equals(other.array[i]))
-                    return false;
-            }
-            return true;
-        }
-
-        /// <summary>
-        /// Enumerator for queue.
-        /// </summary>
-        /// <returns>Object IEnumerator<T> to iterate.</returns>
-        public IEnumerator<T> GetEnumerator() => new IteratorQueue(this);
 
         /// <summary>
         /// Enumerator for queue.
         /// </summary>
         /// <returns>Object IEnumerator to iterate.</returns>
-        IEnumerator IEnumerable.GetEnumerator() => new IteratorQueue(this);
+        public IteratorQueue GetEnumerator() => new IteratorQueue(this);
+
+        IEnumerator<T> IEnumerable<T>.GetEnumerator() => GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
         #region struct IteratorQueue
-        private struct IteratorQueue : IEnumerator<T>
+        public struct IteratorQueue : IEnumerator<T>
         {
             private Queue<T> queue;
             private int index;
@@ -211,7 +179,7 @@ namespace Logic
             {
                 get
                 {
-                    if (index == -1 || index == queue.Count) throw new ArgumentException($"{nameof(index)} is unsuitable.");
+                    if (index == -1 || index == queue.capacity) throw new ArgumentException($"{nameof(index)} is unsuitable.");
                     return queue.array[index];
                 }
             }
@@ -221,10 +189,21 @@ namespace Logic
             public IteratorQueue(Queue<T> queue)
             {
                 this.queue = queue;
-                this.index = -1;
+                this.index = queue.head - 1;
             }
 
-            public bool MoveNext() => ++index < queue.Count;
+            public bool MoveNext()
+            {
+                if (queue.head <= queue.tail)
+                {
+                    return ++index < queue.Count + queue.head;
+                }
+                else
+                {
+                    index = (index + 1) % queue.capacity;
+                    return index != queue.tail;
+                }
+            }
 
             public void Reset() => index = -1;
 
@@ -238,7 +217,24 @@ namespace Logic
         private void Expansion()
         {
             capacity *= 2;
-            Array.Resize(ref array, capacity);
+            T[] newArray = new T[capacity];
+
+            if (count > 0)
+            {
+                if (head < tail)
+                {
+                    Array.Copy(array, head, newArray, 0, count);
+                }
+                else
+                {
+                    Array.Copy(array, head, newArray, 0, array.Length - head);
+                    Array.Copy(array, 0, newArray, array.Length - head, tail);
+                }
+            }
+
+            array = newArray;
+            head = 0;
+            tail = count;
         }
         #endregion
     }
